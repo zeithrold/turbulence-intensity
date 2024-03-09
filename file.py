@@ -10,7 +10,7 @@ def get_sheet_groups(filelist: list[ZipInfo]):
     return list(set(filename_group))
 
 
-def get_dataframe(zipfile: ZipFile | str):
+def get_dataframe(zipfile: ZipFile | str, tick_limit: None | int = None):
     if isinstance(zipfile, str):
         zipfile = ZipFile(zipfile)
     filelist = zipfile.filelist
@@ -23,13 +23,19 @@ def get_dataframe(zipfile: ZipFile | str):
         for f in target_filelist:
             filename = f.filename
             tick = PurePath(filename).stem
-            df = pd.read_excel(zipfile.open(f.filename)) if f.filename.endswith(".xls") else pd.read_csv(zipfile.open(f.filename), sep=';')
+            df = (
+                pd.read_excel(zipfile.open(f.filename))
+                if f.filename.endswith(".xls")
+                else pd.read_csv(zipfile.open(f.filename), sep=";")
+            )
             df["Tick"] = tick
-            df["Tick"] = df["Tick"].astype('int')
+            df["Tick"] = df["Tick"].astype("int")
             dataframe_list.append(df)
         composed_dataframe = pd.concat(dataframe_list)
-        composed_dataframe['Group'] = group
+        composed_dataframe["Group"] = group
         dataframe_groups.append(composed_dataframe)
     result = pd.concat(dataframe_groups)
-    result['Group'] = result['Group'].astype('int')
+    if tick_limit:
+        result = result[(result["Tick"]) <= (result["Tick"].min() + tick_limit)]
+    result["Group"] = result["Group"].astype("int")
     return result
