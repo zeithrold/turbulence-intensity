@@ -1,9 +1,0 @@
-gradio
-pandas
-numpy
-matplotlib
-tqdm
-scipy
-jupyter
-openpyxl
-loguru
