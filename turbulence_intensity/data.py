@@ -107,7 +107,7 @@ def mean_velocity_by_time(
         uuid_column_tag (str): UUID列名
         coordinate_column_tag_list (list[str]): 坐标列名，如`['x', 'y']`，该列名必须维度大于等于2.
         relative_coordinate_column_tag_list (list[str]): 相对坐标列名，如`['x', 'y']`，该列名必须维度大于等于2.
-        velocity_column_tag (list[str]): 速度列名，如`['Vx', 'Vy', 'Vz']`
+        velocity_column_tag_list (list[str]): 速度列名，如`['Vx', 'Vy', 'Vz']`
         euclidean_mean_velocity_tag (str): 欧式平均速度列名
 
     Returns:
@@ -117,8 +117,10 @@ def mean_velocity_by_time(
     def _applier(group: pd.DataFrame):
         filtered_group = group[velocity_column_tag_list]
         velocity_data = filtered_group[velocity_column_tag_list].to_numpy()
-        mean_sub_velocity_by_time = np.linalg.norm(velocity_data, 2, axis=1)
-        assert len(velocity_data) == len(mean_sub_velocity_by_time), "数据长度不匹配"
+        mean_sub_velocity_by_time = np.linalg.norm(velocity_data, 2, axis=0)
+        assert velocity_data.shape[1] == len(mean_sub_velocity_by_time), (
+            "数据长度不匹配"
+        )
         result_dict = {
             key: value
             for key, value in zip(velocity_column_tag_list, mean_sub_velocity_by_time)
@@ -151,6 +153,42 @@ def mean_velocity_by_time(
             *velocity_column_tag_list,
         ]
     ]
+
+
+def mean_turbulent_intensity(
+    data: pd.DataFrame,
+    uuid_column_tag: str,
+    velocity_column_tag_list: list[str],
+    relative_coordinate_column_tag_list: list[str],
+    euclidean_mean_velocity_column_tag: str,
+):
+    def _applier(group: pd.DataFrame):
+        data_length = len(group)
+
+        mean_data = group[velocity_column_tag_list].mean().to_numpy()
+        total_data = group[velocity_column_tag_list].to_numpy()
+
+        turbulent_mean_data = np.linalg.norm(
+            total_data - mean_data, 2, axis=0
+        ) / np.sqrt(data_length)
+
+        euclidean_mean = np.linalg.norm(turbulent_mean_data, 2) / np.sqrt(
+            len(turbulent_mean_data)
+        )
+        result_dict = {
+            key: value
+            for key, value in zip(velocity_column_tag_list, turbulent_mean_data)
+        }
+        result_dict[euclidean_mean_velocity_column_tag] = euclidean_mean
+
+        for key in relative_coordinate_column_tag_list:
+            result_dict[key] = group[key].iloc[0]
+
+        return pd.Series(result_dict)
+
+    st.write(data.groupby(uuid_column_tag)[velocity_column_tag_list].mean())
+    st.write(data)
+    return data.groupby(uuid_column_tag).apply(_applier)
 
 
 def mean_velocity_by_distance(

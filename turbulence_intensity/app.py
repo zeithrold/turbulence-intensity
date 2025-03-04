@@ -18,7 +18,48 @@ file_upload = st.file_uploader(
 preview_tab, parameter_tab = st.tabs(["预览数据", "参数设置"])
 
 
-def show_ntegral_scale_plot(data: pd.DataFrame, velocity_column_tag_list: list[str]):
+def show_mean_by_time_3d_surface_plot(
+    data: pd.DataFrame, relative_coord_column_tags: list[str], title: str
+):
+    x = data[relative_coord_column_tags[0]].values
+    y = data[relative_coord_column_tags[1]].values
+    z = data["Euclidean Velocity [mm/s]"].values
+
+    # Create a regular grid to interpolate the data
+    xi = np.linspace(x.min(), x.max(), 100)
+    yi = np.linspace(y.min(), y.max(), 100)
+    xi_grid, yi_grid = np.meshgrid(xi, yi)
+
+    # Interpolate the data
+    zi_grid = griddata((x, y), z, (xi_grid, yi_grid), method="cubic")
+
+    # 创建3D Surface Plot
+    fig = go.Figure(
+        data=[
+            go.Surface(
+                x=xi,
+                y=yi,
+                z=zi_grid,
+                colorscale="Viridis",
+                colorbar=dict(title="Euclidean Velocity [mm/s]"),
+            )
+        ]
+    )
+
+    # 设置 Label
+    fig.update_layout(
+        scene=dict(
+            xaxis_title=relative_coord_column_tags[0],
+            yaxis_title=relative_coord_column_tags[1],
+            zaxis_title="Euclidean Velocity [mm/s]",
+        ),
+        title=title,
+    )
+
+    return fig
+
+
+def show_itegral_scale_plot(data: pd.DataFrame, velocity_column_tag_list: list[str]):
     # 现在有如下数据：
     # "Coord Tag"、"Diff Multiplier" 与 velocity_column_tag_list提供的列名
     # 想要以"Diff Multiplier"为x轴，以velocity_column_tag_list提供的列名与"Coord Tag"的组合为y轴
@@ -130,47 +171,6 @@ def show_mean_velocity_by_distance_plot(data: pd.DataFrame):
     return fig
 
 
-def show_mean_by_time_3d_surface_plot(
-    data: pd.DataFrame, relative_coord_column_tags: list[str]
-):
-    x = data[relative_coord_column_tags[0]].values
-    y = data[relative_coord_column_tags[1]].values
-    z = data["Euclidean Velocity [mm/s]"].values
-
-    # Create a regular grid to interpolate the data
-    xi = np.linspace(x.min(), x.max(), 100)
-    yi = np.linspace(y.min(), y.max(), 100)
-    xi_grid, yi_grid = np.meshgrid(xi, yi)
-
-    # Interpolate the data
-    zi_grid = griddata((x, y), z, (xi_grid, yi_grid), method="cubic")
-
-    # 创建3D Surface Plot
-    fig = go.Figure(
-        data=[
-            go.Surface(
-                x=xi,
-                y=yi,
-                z=zi_grid,
-                colorscale="Viridis",
-                colorbar=dict(title="Euclidean Velocity [mm/s]"),
-            )
-        ]
-    )
-
-    # 设置 Label
-    fig.update_layout(
-        scene=dict(
-            xaxis_title=relative_coord_column_tags[0],
-            yaxis_title=relative_coord_column_tags[1],
-            zaxis_title="Euclidean Velocity [mm/s]",
-        ),
-        title="3D Surface Plot of Velocity",
-    )
-
-    return fig
-
-
 if file_upload:
     st.info(
         "请务必在预览数据后 **明确指定计算数据的四至范围，避免风扇区域的采样混乱导致数据分析有误！**",
@@ -269,6 +269,8 @@ if file_upload:
                 merged_dataframe, "UUID", coord_column_tags
             )
 
+            st.write(merged_dataframe)
+
             mean_velocity_by_time_result = data.mean_velocity_by_time(
                 merged_dataframe,
                 "UUID",
@@ -279,9 +281,27 @@ if file_upload:
             )
 
             fig_mean_by_time = show_mean_by_time_3d_surface_plot(
-                mean_velocity_by_time_result, relative_coord_column_tags
+                mean_velocity_by_time_result,
+                relative_coord_column_tags,
+                "Mean Velocity by Time (Simple Average)",
             )
-            st.plotly_chart(fig_mean_by_time)
+            st.plotly_chart(fig_mean_by_time, key="mean_by_time")
+
+            mean_turbulent_intensity_result = data.mean_turbulent_intensity(
+                merged_dataframe,
+                "UUID",
+                velocity_column_tags,
+                relative_coord_column_tags,
+                "Euclidean Velocity [mm/s]",
+            )
+
+            fig_turbulent_intensity = show_mean_by_time_3d_surface_plot(
+                mean_turbulent_intensity_result,
+                relative_coord_column_tags,
+                "Turbulent Intensity",
+            )
+
+            st.plotly_chart(fig_turbulent_intensity, key="turbulent_intensity")
 
             mean_velocity_by_distance_result = data.mean_velocity_by_distance(
                 mean_velocity_by_time_result,
@@ -305,7 +325,7 @@ if file_upload:
                 max_diff_multiplier=max_diff_multiplier,
             )
 
-            fig_integral_scale = show_ntegral_scale_plot(
+            fig_integral_scale = show_itegral_scale_plot(
                 integral_scale_result, velocity_column_tags
             )
 
@@ -321,6 +341,9 @@ if file_upload:
             integral_scale_csv = integral_scale_result.to_csv(index=False).encode(
                 "utf-8"
             )
+            mean_turbulent_intensity_result_csv = (
+                mean_turbulent_intensity_result.to_csv(index=False).encode("utf-8")
+            )
 
             with TemporaryDirectory() as temp_dir:
                 with ZipFile(Path(temp_dir) / "result.zip", "w") as zip_file:
@@ -332,6 +355,10 @@ if file_upload:
                         "mean_velocity_by_distance.csv", mean_velocity_by_distance_csv
                     )
                     zip_file.writestr("integral_scale.csv", integral_scale_csv)
+                    zip_file.writestr(
+                        "mean_turbulent_intensity_result.csv",
+                        mean_turbulent_intensity_result_csv,
+                    )
 
                 file_path = Path(temp_dir) / "result.zip"
 
