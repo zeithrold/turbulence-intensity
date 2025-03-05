@@ -161,6 +161,7 @@ def mean_turbulent_intensity(
     velocity_column_tag_list: list[str],
     relative_coordinate_column_tag_list: list[str],
     euclidean_mean_velocity_column_tag: str,
+    coordinate_column_tag_list: list[str],
 ):
     def _applier(group: pd.DataFrame):
         data_length = len(group)
@@ -180,14 +181,13 @@ def mean_turbulent_intensity(
             for key, value in zip(velocity_column_tag_list, turbulent_mean_data)
         }
         result_dict[euclidean_mean_velocity_column_tag] = euclidean_mean
-
+        for key in coordinate_column_tag_list:
+            result_dict[key] = group[key].iloc[0]
         for key in relative_coordinate_column_tag_list:
             result_dict[key] = group[key].iloc[0]
 
         return pd.Series(result_dict)
 
-    st.write(data.groupby(uuid_column_tag)[velocity_column_tag_list].mean())
-    st.write(data)
     return data.groupby(uuid_column_tag).apply(_applier)
 
 

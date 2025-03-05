@@ -99,7 +99,7 @@ def show_itegral_scale_plot(data: pd.DataFrame, velocity_column_tag_list: list[s
     pass
 
 
-def show_mean_velocity_by_distance_plot(data: pd.DataFrame):
+def show_mean_velocity_by_distance_plot(data: pd.DataFrame, title: str):
     # Create figure for mean velocity by distance
     fig = go.Figure()
 
@@ -162,7 +162,7 @@ def show_mean_velocity_by_distance_plot(data: pd.DataFrame):
 
     # Update layout
     fig.update_layout(
-        title="Velocity Distribution by Distance",
+        title=title,
         xaxis_title="Mean Distance",
         yaxis_title="Velocity (m/s)",
         hovermode="x",
@@ -293,6 +293,7 @@ if file_upload:
                 velocity_column_tags,
                 relative_coord_column_tags,
                 "Euclidean Velocity [mm/s]",
+                coord_column_tags,
             )
 
             fig_turbulent_intensity = show_mean_by_time_3d_surface_plot(
@@ -312,10 +313,29 @@ if file_upload:
             )
 
             fig_mean_velocity_by_distance = show_mean_velocity_by_distance_plot(
-                mean_velocity_by_distance_result
+                mean_velocity_by_distance_result, "Velocity Distribution by Distance"
             )
 
             st.plotly_chart(fig_mean_velocity_by_distance)
+
+            mean_turbulent_intensity_by_distance_result = (
+                data.mean_velocity_by_distance(
+                    mean_turbulent_intensity_result,
+                    coord_column_tags,
+                    np.array([centre_x, centre_y]),
+                    "Euclidean Velocity [mm/s]",
+                    mean_velocity_group_bins,
+                )
+            )
+
+            fig_mean_turbulent_intensity_by_distance = (
+                show_mean_velocity_by_distance_plot(
+                    mean_turbulent_intensity_by_distance_result,
+                    "Turbulent Intensity Distribution by Distance",
+                )
+            )
+
+            st.plotly_chart(fig_mean_turbulent_intensity_by_distance)
 
             integral_scale_result = data.integral_scale(
                 merged_dataframe,
